@@ -2,10 +2,11 @@
 
 module UnitTests.OptionalFields (optionalFields) where
 
+import UnitTests.OptionalFields.Common
 import UnitTests.OptionalFields.OmitOptionalFields.Generics (omitGenerics)
 import UnitTests.OptionalFields.OmitOptionalFields.TH (omitTH)
 import UnitTests.OptionalFields.RequireOptionalFields.Generics (requireGenerics)
 import UnitTests.OptionalFields.RequireOptionalFields.TH (requireTH)
 
-optionalFields :: [IO ()]
-optionalFields = concat [omitGenerics, omitTH, requireGenerics, requireTH]
+optionalFields :: [TestTree]
+optionalFields = [omitGenerics, omitTH, requireGenerics, requireTH]

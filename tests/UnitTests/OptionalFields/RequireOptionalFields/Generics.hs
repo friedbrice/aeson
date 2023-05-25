@@ -16,12 +16,16 @@ instance ToJSON RecordB where
 instance FromJSON RecordB where
   parseJSON = genericParseJSON defaultOptions { requireOptionalFields = False }
 
-requireGenerics :: [IO ()]
-requireGenerics =
-  [ decodeCase helloWorldRecA helloWorldObj
-  , decodeCase helloRecA helloNullObj
-  , counterCase (undefined :: proxy RecordA) helloObj
-  , decodeCase helloWorldRecB helloWorldObj
-  , decodeCase helloRecB helloNullObj
-  , decodeCase helloRecB helloObj
+requireGenerics :: TestTree
+requireGenerics = testGroup "Require optional fields (Generics)"
+  [ testGroup "requireOptionalFields = True"
+    [ testCase "Non-null field is valid JSON" $ decodeCase helloWorldRecA helloWorldObj
+    , testCase "Null field is valid JSON" $ decodeCase helloRecA helloNullObj
+    , testCase "Absent field is not valid JSON" $ counterCase (undefined :: proxy RecordA) helloObj
+    ]
+  , testGroup "requireOptionalFields = False"
+    [ testCase "Non-null field is valid JSON" $ decodeCase helloWorldRecB helloWorldObj
+    , testCase "Null field is valid JSON" $ decodeCase helloRecB helloNullObj
+    , testCase "Absent field is valid JSON" $ decodeCase helloRecB helloObj
+    ]
   ]

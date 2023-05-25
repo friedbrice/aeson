@@ -10,10 +10,14 @@ instance ToJSON RecordA where
 instance ToJSON RecordB where
   toJSON = genericToJSON defaultOptions { omitNothingFields = False }
 
-omitGenerics :: [IO ()]
-omitGenerics =
-  [ encodeCase helloWorldRecA helloWorldObj
-  , encodeCase helloWorldRecB helloWorldObj
-  , encodeCase helloRecA helloObj
-  , encodeCase helloRecB helloNullObj
+omitGenerics :: TestTree
+omitGenerics = testGroup "Omit optional fields (Generics)"
+  [ testGroup "omitNothingFields = True"
+    [ testCase "JSON should include non-optional value." $ encodeCase helloWorldRecA helloWorldObj
+    , testCase "JSON should not include optional value." $ encodeCase helloRecA helloObj
+    ]
+  , testGroup "omitNothingFields = False"
+    [ testCase "JSON should include non-optional value." $ encodeCase helloWorldRecB helloWorldObj
+    , testCase "JSON should include optional value." $ encodeCase helloRecB helloNullObj
+    ]
   ]

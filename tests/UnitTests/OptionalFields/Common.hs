@@ -4,14 +4,18 @@ module UnitTests.OptionalFields.Common
   ( module UnitTests.OptionalFields.Common
   , module Data.Aeson
   , module Data.Aeson.TH
+  , module Test.Tasty
+  , module Test.Tasty.HUnit
   ) where
 
-import Control.Monad (guard)
 import Data.Aeson
 import Data.Aeson.TH
 import GHC.Generics
+import Test.Tasty
+import Test.Tasty.HUnit
 import qualified Data.Aeson.Key as K
 import qualified Data.Aeson.KeyMap as KM
+import qualified Data.Text as T
 
 newtype NullableNonEmptyString = NullableNonEmptyString (Maybe String)
   deriving (Eq, Ord, Show, Generic, Semigroup, Monoid) via Maybe String
@@ -21,7 +25,10 @@ instance ToJSON NullableNonEmptyString where
   omitOptionalField (NullableNonEmptyString x) = null x
 
 instance FromJSON NullableNonEmptyString where
-  parseJSON = fmap nne . parseJSON
+  parseJSON Null = pure mempty
+  parseJSON (String x) = pure (nne $ T.unpack x)
+  parseJSON _ = fail "NullableNonEmptyString.parseJSON: expected String or Null"
+
   optionalDefault = Just mempty
 
 nne :: String -> NullableNonEmptyString
@@ -47,14 +54,14 @@ data RecordB = RecordB
   }
   deriving Generic
 
-encodeCase :: ToJSON a => a -> Value -> IO ()
-encodeCase x v = guard $ encode x == encode v
+encodeCase :: HasCallStack => ToJSON a => a -> Value -> IO ()
+encodeCase record object' = decode @Value (encode record) @?= Just object'
 
-decodeCase :: forall a. (FromJSON a, ToJSON a) => a -> Value -> IO ()
-decodeCase x v = guard $ (fmap encode . decode @a . encode) v == Just (encode x)
+decodeCase :: forall a. HasCallStack => (FromJSON a, ToJSON a) => a -> Value -> IO ()
+decodeCase record object' = (fmap encode . decode @a . encode) object' @?= Just (encode record)
 
-counterCase :: forall a proxy. (FromJSON a, ToJSON a) => proxy a -> Value -> IO ()
-counterCase _ v = guard $ (null . decode @a . encode) v
+counterCase :: forall a proxy. HasCallStack => (FromJSON a, ToJSON a) => proxy a -> Value -> IO ()
+counterCase _ object' = assertBool "decode should fail" $ (null . decode @a . encode) object'
 
 helloWorldRecA :: RecordA
 helloWorldRecA = RecordA "hello" (nne "world")

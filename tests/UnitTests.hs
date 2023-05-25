@@ -444,6 +444,7 @@ showOptions =
         ++ ", unwrapUnaryRecords = False"
         ++ ", tagSingleConstructors = False"
         ++ ", rejectUnknownFields = False"
+        ++ ", requireOptionalFields = False"
         ++ "}")
         (show defaultOptions)
 
@@ -804,7 +805,7 @@ tests = testGroup "unit" [
   , testGroup "Object construction" $ fmap (testCase "-") objectConstruction
   , testGroup "Issue #351" $ fmap (testCase "-") issue351
   , testGroup "Nullary constructors" $ fmap (testCase "-") nullaryConstructors
-  , testGroup "Optional fields" $ fmap (testCase "-") optionalFields
+  , testGroup "Optional fields" optionalFields
   , testGroup "FromJSONKey" $ fmap (testCase "-") fromJSONKeyAssertions
   , testCase "PR #455" pr455
   , testCase "Unescape string (PR #477)" unescapeString
