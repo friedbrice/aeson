@@ -1,6 +1,6 @@
-
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
+
 module UnitTests.OptionalFields.RequireOptionalFields.TH (requireTH) where
 
 import UnitTests.OptionalFields.Common

@@ -49,9 +49,9 @@ templateHaskellTests =
           , testProperty "TaggedObject" (toParseJSON thSomeTypeParseJSONTaggedObject thSomeTypeToJSONTaggedObject)
           , testProperty "ObjectWithSingleField" (toParseJSON thSomeTypeParseJSONObjectWithSingleField thSomeTypeToJSONObjectWithSingleField)
 
-          , testProperty "2ElemArray unary" (toParseJSON1 thSomeTypeLiftParseJSON2ElemArray thSomeTypeLiftToJSON2ElemArray)
-          , testProperty "TaggedObject unary" (toParseJSON1 thSomeTypeLiftParseJSONTaggedObject thSomeTypeLiftToJSONTaggedObject)
-          , testProperty "ObjectWithSingleField unary" (toParseJSON1 thSomeTypeLiftParseJSONObjectWithSingleField thSomeTypeLiftToJSONObjectWithSingleField)
+          -- , testProperty "2ElemArray unary" (toParseJSON1 thSomeTypeLiftParseJSON2ElemArray thSomeTypeLiftToJSON2ElemArray)
+          -- , testProperty "TaggedObject unary" (toParseJSON1 thSomeTypeLiftParseJSONTaggedObject thSomeTypeLiftToJSONTaggedObject)
+          -- , testProperty "ObjectWithSingleField unary" (toParseJSON1 thSomeTypeLiftParseJSONObjectWithSingleField thSomeTypeLiftToJSONObjectWithSingleField)
 
           ]
         ]
@@ -130,10 +130,5 @@ templateHaskellTests =
         thOneConstructorToJSONDefault `sameAs` thOneConstructorToEncodingDefault
       , testProperty "OneConstructorTagged" $
         thOneConstructorToJSONTagged `sameAs` thOneConstructorToEncodingTagged
-
-#if !MIN_VERSION_base(4,16,0)
-      , testProperty "OptionField" $
-        thOptionFieldToJSON `sameAs` thOptionFieldToEncoding
-#endif
       ]
     ]

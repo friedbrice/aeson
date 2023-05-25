@@ -71,14 +71,11 @@ module Data.Aeson.Types.FromJSON
     , (.:?)
     , (.:!)
     , (.!=)
-
-    -- * Internal
-    , parseOptionalFieldWith
     ) where
 
 import Prelude.Compat
 
-import Control.Applicative ((<|>), Const(..), liftA2)
+import Control.Applicative ((<|>), Const(..))
 import Control.Monad (zipWithM)
 import Data.Aeson.Internal.Functions (mapKey, mapKeyO)
 import Data.Aeson.Parser.Internal (eitherDecodeWith, jsonEOF)
@@ -233,13 +230,6 @@ parseBoundedIntegralText :: (Bounded a, Integral a) => String -> Text -> Parser 
 parseBoundedIntegralText name t =
     prependContext name $
         parseScientificText t >>= parseBoundedIntegralFromScientific
-
-parseOptionalFieldWith :: (Value -> Parser (Maybe a))
-                       -> Object -> Key -> Parser (Maybe a)
-parseOptionalFieldWith pj obj key =
-    case KM.lookup key obj of
-     Nothing -> pure Nothing
-     Just v  -> pj v <?> Key key
 
 -------------------------------------------------------------------------------
 -- Generics
@@ -1358,15 +1348,16 @@ instance ( RecordFromJSON' arity a
               <*> recordParseJSON' p obj
     {-# INLINE recordParseJSON' #-}
 
-instance {-# OVERLAPPABLE #-} (Selector s, GFromJSON arity a) =>
+instance (Selector s, GFromJSON arity a) =>
          RecordFromJSON' arity (S1 s a) where
-    recordParseJSON' (cname :* tname :* opts :* fargs) obj
-      | requireOptionalFields opts = requireField
-      | label `KM.member` obj = requireField
-      | Nothing <- maybeDef = requireField
-      | Just def <- maybeDef = pure def
+    recordParseJSON' (cname :* tname :* opts :* fargs) obj =
+      if requireOptionalFields opts || label `KM.member` obj
+        then parseFieldValue
+        else case maybeDef of
+          Nothing -> parseFieldValue
+          Just def -> pure def
       where
-        requireField = do
+        parseFieldValue = do
           fv <- contextCons cname tname (obj .: label)
           M1 <$> gParseJSON opts fargs fv <?> Key label
 
@@ -1374,25 +1365,6 @@ instance {-# OVERLAPPABLE #-} (Selector s, GFromJSON arity a) =>
         label = Key.fromString $ fieldLabelModifier opts sname
         sname = selName (undefined :: M1 _i s _f _p)
     {-# INLINE recordParseJSON' #-}
-
-instance {-# INCOHERENT #-} (Selector s, FromJSON a) =>
-         RecordFromJSON' arity (S1 s (K1 i (Maybe a))) where
-    recordParseJSON' (_ :* _ :* opts :* _) obj = M1 . K1 <$> obj .:? label
-      where
-        label = Key.fromString $ fieldLabelModifier opts sname
-        sname = selName (undefined :: M1 _i s _f _p)
-    {-# INLINE recordParseJSON' #-}
-
-#if !MIN_VERSION_base(4,16,0)
--- Parse an Option like a Maybe.
-instance {-# INCOHERENT #-} (Selector s, FromJSON a) =>
-         RecordFromJSON' arity (S1 s (K1 i (Semigroup.Option a))) where
-    recordParseJSON' p obj = wrap <$> recordParseJSON' p obj
-      where
-        wrap :: S1 s (K1 i (Maybe a)) p -> S1 s (K1 i (Semigroup.Option a)) p
-        wrap (M1 (K1 a)) = M1 (K1 (Semigroup.Option a))
-    {-# INLINE recordParseJSON' #-}
-#endif
 
 --------------------------------------------------------------------------------
 

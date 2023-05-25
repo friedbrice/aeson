@@ -1148,49 +1148,13 @@ instance ( Selector s
          , KeyValuePair enc pairs
          ) => RecordToPairs enc pairs arity (S1 s a)
   where
-    recordToPairs = fieldToPair
+    recordToPairs opts targs m1
+      | omitNothingFields opts && gOmitOptionalField (undefined :: proxy enc) (undefined :: proxy' arity) (unM1 m1) = mempty
+      | otherwise =
+        let key   = Key.fromString $ fieldLabelModifier opts (selName m1)
+            value = gToJSON opts targs (unM1 m1)
+         in key `pair` value
     {-# INLINE recordToPairs #-}
-
-instance {-# INCOHERENT #-}
-    ( Selector s
-    , GToJSON' enc arity (K1 i (Maybe a))
-    , KeyValuePair enc pairs
-    , Monoid pairs
-    ) => RecordToPairs enc pairs arity (S1 s (K1 i (Maybe a)))
-  where
-    recordToPairs opts _ (M1 k1) | omitNothingFields opts
-                                 , K1 Nothing <- k1 = mempty
-    recordToPairs opts targs m1 = fieldToPair opts targs m1
-    {-# INLINE recordToPairs #-}
-
-#if !MIN_VERSION_base(4,16,0)
-instance {-# INCOHERENT #-}
-    ( Selector s
-    , GToJSON' enc arity (K1 i (Maybe a))
-    , KeyValuePair enc pairs
-    , Monoid pairs
-    ) => RecordToPairs enc pairs arity (S1 s (K1 i (Semigroup.Option a)))
-  where
-    recordToPairs opts targs = recordToPairs opts targs . unwrap
-      where
-        unwrap :: S1 s (K1 i (Semigroup.Option a)) p -> S1 s (K1 i (Maybe a)) p
-        unwrap (M1 (K1 (Semigroup.Option a))) = M1 (K1 a)
-    {-# INLINE recordToPairs #-}
-#endif
-
-fieldToPair :: forall s enc arity a pairs p.
-               (Selector s
-               , GToJSON' enc arity a
-               , KeyValuePair enc pairs)
-            => Options -> ToArgs enc arity p
-            -> S1 s a p -> pairs
-fieldToPair opts targs m1
-  | omitOptionalFields opts && gOmitOptionalField (undefined :: proxy enc) (undefined :: proxy' arity) (unM1 m1) = mempty
-  | otherwise =
-    let key   = Key.fromString $ fieldLabelModifier opts (selName m1)
-        value = gToJSON opts targs (unM1 m1)
-    in key `pair` value
-{-# INLINE fieldToPair #-}
 
 --------------------------------------------------------------------------------
 

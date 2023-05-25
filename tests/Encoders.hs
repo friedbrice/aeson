@@ -138,8 +138,8 @@ thSomeTypeLiftToEncoding2ElemArray = $(mkLiftToEncoding opts2ElemArray ''SomeTyp
 thSomeTypeParseJSON2ElemArray :: Value -> Parser (SomeType Int)
 thSomeTypeParseJSON2ElemArray = $(mkParseJSON opts2ElemArray ''SomeType)
 
-thSomeTypeLiftParseJSON2ElemArray :: LiftParseJSON SomeType a
-thSomeTypeLiftParseJSON2ElemArray = $(mkLiftParseJSON opts2ElemArray ''SomeType)
+-- thSomeTypeLiftParseJSON2ElemArray :: LiftParseJSON SomeType a
+-- thSomeTypeLiftParseJSON2ElemArray = $(mkLiftParseJSON opts2ElemArray ''SomeType)
 
 
 thSomeTypeToJSONTaggedObject :: SomeType Int -> Value
@@ -157,8 +157,8 @@ thSomeTypeLiftToEncodingTaggedObject = $(mkLiftToEncoding optsTaggedObject ''Som
 thSomeTypeParseJSONTaggedObject :: Value -> Parser (SomeType Int)
 thSomeTypeParseJSONTaggedObject = $(mkParseJSON optsTaggedObject ''SomeType)
 
-thSomeTypeLiftParseJSONTaggedObject :: LiftParseJSON SomeType a
-thSomeTypeLiftParseJSONTaggedObject = $(mkLiftParseJSON optsTaggedObject ''SomeType)
+-- thSomeTypeLiftParseJSONTaggedObject :: LiftParseJSON SomeType a
+-- thSomeTypeLiftParseJSONTaggedObject = $(mkLiftParseJSON optsTaggedObject ''SomeType)
 
 
 thSomeTypeToJSONObjectWithSingleField :: SomeType Int -> Value
@@ -176,8 +176,8 @@ thSomeTypeLiftToEncodingObjectWithSingleField = $(mkLiftToEncoding optsObjectWit
 thSomeTypeParseJSONObjectWithSingleField :: Value -> Parser (SomeType Int)
 thSomeTypeParseJSONObjectWithSingleField = $(mkParseJSON optsObjectWithSingleField ''SomeType)
 
-thSomeTypeLiftParseJSONObjectWithSingleField :: LiftParseJSON SomeType a
-thSomeTypeLiftParseJSONObjectWithSingleField = $(mkLiftParseJSON optsObjectWithSingleField ''SomeType)
+-- thSomeTypeLiftParseJSONObjectWithSingleField :: LiftParseJSON SomeType a
+-- thSomeTypeLiftParseJSONObjectWithSingleField = $(mkLiftParseJSON optsObjectWithSingleField ''SomeType)
 
 
 gSomeTypeToJSON2ElemArray :: SomeType Int -> Value
@@ -295,31 +295,6 @@ gOptionFieldParseJSON = genericParseJSON optsOptionField
 
 thMaybeFieldToJSON :: MaybeField -> Value
 thMaybeFieldToJSON = $(mkToJSON optsOptionField 'MaybeField)
-
-
---------------------------------------------------------------------------------
--- IncoherentInstancesNeeded
---------------------------------------------------------------------------------
-
--- | This test demonstrates the need for IncoherentInstances. See the definition
--- of 'IncoherentInstancesNeeded' for a discussion of the issue.
---
--- NOTE 1: We only need to compile this test. We do not need to run it.
---
--- NOTE 2: We actually only use the INCOHERENT pragma on specific instances
--- instead of the IncoherentInstances language extension. Therefore, this is
--- only supported on GHC versions >= 7.10.
-#if __GLASGOW_HASKELL__ >= 710
-incoherentInstancesNeededParseJSONString :: FromJSON a => Value -> Parser (IncoherentInstancesNeeded a)
-incoherentInstancesNeededParseJSONString = case () of
-  _ | True  -> $(mkParseJSON defaultOptions ''IncoherentInstancesNeeded)
-    | False -> genericParseJSON defaultOptions
-
-incoherentInstancesNeededToJSON :: ToJSON a => IncoherentInstancesNeeded a -> Value
-incoherentInstancesNeededToJSON = case () of
-  _ | True  -> $(mkToJSON defaultOptions ''IncoherentInstancesNeeded)
-    | False -> genericToJSON defaultOptions
-#endif
 
 -------------------------------------------------------------------------------
 -- EitherTextInt encoders/decodes

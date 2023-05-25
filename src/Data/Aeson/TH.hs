@@ -123,7 +123,6 @@ import Data.Char (ord)
 import Data.Aeson (Object, (.:), FromJSON(..), FromJSON1(..), FromJSON2(..), ToJSON(..), ToJSON1(..), ToJSON2(..))
 import Data.Aeson.Types (Options(..), Parser, SumEncoding(..), Value(..), defaultOptions, defaultTaggedObject)
 import Data.Aeson.Types.Internal ((<?>), JSONPathElement(Key))
-import Data.Aeson.Types.FromJSON (parseOptionalFieldWith)
 import Data.Aeson.Types.ToJSON (fromPairs, pair)
 import Data.Aeson.Key (Key)
 import qualified Data.Aeson.Key as Key
@@ -149,9 +148,6 @@ import qualified Data.Aeson.Encoding.Internal as E
 import qualified Data.Foldable as F (all)
 import qualified Data.List.NonEmpty as NE (length, reverse)
 import qualified Data.Map as M (fromList, keys, lookup , singleton, size)
-#if !MIN_VERSION_base(4,16,0)
-import qualified Data.Semigroup as Semigroup (Option(..))
-#endif
 import qualified Data.Set as Set (empty, insert, member)
 import qualified Data.Text as T (pack, unpack)
 import qualified Data.Vector as V (unsafeIndex, null, length, create, empty)
@@ -488,8 +484,7 @@ argsToValue letInsert target jc tvMap opts multiCons
 
                 omitFn :: ExpQ
                 omitFn
-                  | omitNothingFields opts && omitOptionalFields opts = [| omitOptionalField |]
-                  | omitNothingFields opts || omitOptionalFields opts = error "Data.Aeson.TH: option omitNothingFields is deprecated, and until removed it must agree with omitOptionalFields"
+                  | omitNothingFields opts = [| omitOptionalField |]
                   | otherwise = [| const False |]
 
               in
@@ -1138,26 +1133,9 @@ parseTypeMismatch tName conName expected actual =
           , actual
           ]
 
-class LookupField a where
-    lookupField :: Maybe a -> (Value -> Parser a) -> String -> String
-                -> Object -> Key -> Parser a
-
-instance {-# OVERLAPPABLE #-} LookupField a where
-    lookupField = lookupFieldWith
-
-instance {-# INCOHERENT #-} LookupField (Maybe a) where
-    lookupField _ pj _ _ = parseOptionalFieldWith pj
-
-#if !MIN_VERSION_base(4,16,0)
-instance {-# INCOHERENT #-} LookupField (Semigroup.Option a) where
-    lookupField _ pj tName rec obj key =
-        fmap Semigroup.Option
-             (lookupField (fmap Semigroup.getOption . pj) tName rec obj key)
-#endif
-
-lookupFieldWith :: Maybe a -> (Value -> Parser a) -> String -> String
-                -> Object -> Key -> Parser a
-lookupFieldWith maybeDefault pj tName rec obj key =
+lookupField :: Maybe a -> (Value -> Parser a) -> String -> String
+            -> Object -> Key -> Parser a
+lookupField maybeDefault pj tName rec obj key =
     case KM.lookup key obj of
       Nothing ->
         case maybeDefault of

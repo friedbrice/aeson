@@ -6,11 +6,11 @@ module UnitTests.OptionalFields.OmitOptionalFields.TH (omitTH) where
 import UnitTests.OptionalFields.Common
 
 $(deriveToJSON
-  defaultOptions { omitNothingFields = True, omitOptionalFields = True }
+  defaultOptions { omitNothingFields = True }
   ''RecordA)
 
 $(deriveToJSON
-  defaultOptions { omitNothingFields = False, omitOptionalFields = False }
+  defaultOptions { omitNothingFields = False }
   ''RecordB)
 
 omitTH :: [IO ()]

@@ -5,10 +5,10 @@ module UnitTests.OptionalFields.OmitOptionalFields.Generics (omitGenerics) where
 import UnitTests.OptionalFields.Common
 
 instance ToJSON RecordA where
-  toJSON = genericToJSON defaultOptions { omitNothingFields = True, omitOptionalFields = True }
+  toJSON = genericToJSON defaultOptions { omitNothingFields = True }
 
 instance ToJSON RecordB where
-  toJSON = genericToJSON defaultOptions { omitNothingFields = False, omitOptionalFields = False }
+  toJSON = genericToJSON defaultOptions { omitNothingFields = False }
 
 omitGenerics :: [IO ()]
 omitGenerics =
