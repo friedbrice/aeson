@@ -176,6 +176,9 @@ class GToJSON' enc arity f where
     -- and 'liftToEncoding' (if the @arity@ is 'One').
     gToJSON :: Options -> ToArgs enc arity a -> f a -> enc
 
+    gOmitOptionalField :: proxy enc -> proxy' arity -> f a -> Bool
+    gOmitOptionalField _ _ _ = False
+
 -- | A 'ToArgs' value either stores nothing (for 'ToJSON') or it stores the two
 -- function arguments that encode occurrences of the type parameter (for
 -- 'ToJSON1').
@@ -302,6 +305,9 @@ genericLiftToEncoding opts te tel = gToJSON opts (To1Args te tel) . from1
 class ToJSON a where
     -- | Convert a Haskell value to a JSON-friendly intermediate type.
     toJSON     :: a -> Value
+
+    omitOptionalField :: a -> Bool
+    omitOptionalField = const False
 
     default toJSON :: (Generic a, GToJSON' Value Zero (Rep a)) => a -> Value
     toJSON = genericToJSON defaultOptions
@@ -733,6 +739,9 @@ instance {-# OVERLAPPABLE #-} (GToJSON' enc arity a) => GToJSON' enc arity (M1 i
     gToJSON opts targs = gToJSON opts targs . unM1
     {-# INLINE gToJSON #-}
 
+    gOmitOptionalField _ _ (M1 a) = gOmitOptionalField (undefined :: proxy enc) (undefined :: proxy' arity) a
+    {-# INLINE gOmitOptionalField #-}
+
 instance GToJSON' enc One Par1 where
     -- Direct occurrences of the last type parameter are encoded with the
     -- function passed in as an argument:
@@ -787,6 +796,9 @@ instance ToJSON a => GToJSON' Value arity (K1 i a) where
     gToJSON _opts _ = toJSON . unK1
     {-# INLINE gToJSON #-}
 
+    gOmitOptionalField _ _ (K1 a) = omitOptionalField a
+    {-# INLINE gOmitOptionalField #-}
+
 instance ToJSON1 f => GToJSON' Value One (Rec1 f) where
     -- Recursive occurrences of the last type parameter are encoded using their
     -- ToJSON1 instance:
@@ -840,6 +852,9 @@ instance ToJSON a => GToJSON' Encoding arity (K1 i a) where
     -- Constant values are encoded using their ToJSON instance:
     gToJSON _opts _ = toEncoding . unK1
     {-# INLINE gToJSON #-}
+
+    gOmitOptionalField _ _ (K1 a) = omitOptionalField a
+    {-# INLINE gOmitOptionalField #-}
 
 instance ToJSON1 f => GToJSON' Encoding One (Rec1 f) where
     -- Recursive occurrences of the last type parameter are encoded using their
@@ -1163,15 +1178,18 @@ instance {-# INCOHERENT #-}
     {-# INLINE recordToPairs #-}
 #endif
 
-fieldToPair :: (Selector s
+fieldToPair :: forall s enc arity a pairs p.
+               (Selector s
                , GToJSON' enc arity a
                , KeyValuePair enc pairs)
             => Options -> ToArgs enc arity p
             -> S1 s a p -> pairs
-fieldToPair opts targs m1 =
-  let key   = Key.fromString $ fieldLabelModifier opts (selName m1)
-      value = gToJSON opts targs (unM1 m1)
-  in key `pair` value
+fieldToPair opts targs m1
+  | omitOptionalFields opts && gOmitOptionalField (undefined :: proxy enc) (undefined :: proxy' arity) (unM1 m1) = mempty
+  | otherwise =
+    let key   = Key.fromString $ fieldLabelModifier opts (selName m1)
+        value = gToJSON opts targs (unM1 m1)
+    in key `pair` value
 {-# INLINE fieldToPair #-}
 
 --------------------------------------------------------------------------------
@@ -1291,6 +1309,7 @@ instance ToJSON1 Maybe where
 
 instance (ToJSON a) => ToJSON (Maybe a) where
     toJSON = toJSON1
+    omitOptionalField = null
     toEncoding = toEncoding1
 
 
@@ -2109,6 +2128,8 @@ instance ToJSON1 Semigroup.Option where
 instance ToJSON a => ToJSON (Semigroup.Option a) where
     toJSON = toJSON1
     toEncoding = toEncoding1
+    omitOptionalField (Option Nothing) = True
+    omitOptionalField (Option Just {}) = False
 #endif
 
 -------------------------------------------------------------------------------

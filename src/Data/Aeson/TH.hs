@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE EmptyCase #-}
@@ -117,6 +118,7 @@ import Prelude.Compat hiding (fail)
 import Prelude (fail)
 
 import Control.Applicative ((<|>))
+import Data.Bool (bool)
 import Data.Char (ord)
 import Data.Aeson (Object, (.:), FromJSON(..), FromJSON1(..), FromJSON2(..), ToJSON(..), ToJSON1(..), ToJSON2(..))
 import Data.Aeson.Types (Options(..), Parser, SumEncoding(..), Value(..), defaultOptions, defaultTaggedObject)
@@ -131,7 +133,7 @@ import Data.Foldable (foldr')
 #if MIN_VERSION_template_haskell(2,8,0) && !MIN_VERSION_template_haskell(2,10,0)
 import Data.List (nub)
 #endif
-import Data.List (foldl', genericLength, intercalate, partition, union)
+import Data.List (foldl', genericLength, intercalate, union)
 import Data.List.NonEmpty ((<|), NonEmpty((:|)))
 import Data.Map (Map)
 import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
@@ -388,7 +390,7 @@ opaqueSumToValue letInsert target opts multiCons nullary conName value =
 recordSumToValue :: LetInsert -> ToJSONFun -> Options -> Bool -> Bool -> Name -> ExpQ -> ExpQ
 recordSumToValue letInsert target opts multiCons nullary conName pairs =
   sumToValue letInsert target opts multiCons nullary conName
-    (fromPairsE target pairs)
+    (fromPairsE opts target pairs)
     (const pairs)
 
 -- | Wrap fields of a constructor.
@@ -427,10 +429,10 @@ sumToValue letInsert target opts multiCons nullary conName value pairs
             -- tagFieldName overwrites a field in pairs.
             let tag = pairE letInsert target tagFieldName (conStr target opts conName)
                 content = pairs contentsFieldName
-            in fromPairsE target $
+            in fromPairsE opts target $
               if nullary then tag else infixApp tag [|(Monoid.<>)|] content
           ObjectWithSingleField ->
-            objectE letInsert target [(conString opts conName, value)]
+            objectE opts letInsert target [(conString opts conName, value)]
           UntaggedValue | nullary -> conStr target opts conName
           UntaggedValue -> value
     | otherwise = value
@@ -468,40 +470,36 @@ argsToValue letInsert target jc tvMap opts multiCons
       (True,True,[_]) -> argsToValue letInsert target jc tvMap opts multiCons
                                      (info{constructorVariant = NormalConstructor})
       _ -> do
+
         argTys' <- mapM resolveTypeSynonyms argTys
         args <- newNameList "arg" $ length argTys'
-        let pairs | omitNothingFields opts = infixApp maybeFields
-                                                      [|(Monoid.<>)|]
-                                                      restFields
-                  | otherwise = mconcatE (map pureToPair argCons)
-
+        let
+            argCons :: [(ExpQ, Type, Name)]
             argCons = zip3 (map varE args) argTys' fields
 
-            maybeFields = mconcatE (map maybeToPair maybes)
+            toPair :: (ExpQ, Type, Name) -> ExpQ
+            toPair (arg, argTy, fld) =
+              let
+                fieldName :: String
+                fieldName = fieldLabel opts fld
 
-            restFields = mconcatE (map pureToPair rest)
+                toValue :: ExpQ
+                toValue = dispatchToJSON target jc conName tvMap argTy
 
-            (maybes0, rest0) = partition isMaybe argCons
-#if MIN_VERSION_base(4,16,0)
-            maybes = maybes0
-            rest   = rest0
-#else
-            (options, rest) = partition isOption rest0
-            maybes = maybes0 ++ map optionToMaybe options
-#endif
+                omitFn :: ExpQ
+                omitFn
+                  | omitNothingFields opts && omitOptionalFields opts = [| omitOptionalField |]
+                  | omitNothingFields opts || omitOptionalFields opts = error "Data.Aeson.TH: option omitNothingFields is deprecated, and until removed it must agree with omitOptionalFields"
+                  | otherwise = [| const False |]
 
-            maybeToPair = toPairLifted True
-            pureToPair = toPairLifted False
+              in
+              [| \f x arg' -> bool x mempty (f arg') |]
+                `appE` omitFn
+                `appE` pairE letInsert target fieldName (toValue `appE` arg)
+                `appE` arg
 
-            toPairLifted lifted (arg, argTy, field) =
-              let toValue = dispatchToJSON target jc conName tvMap argTy
-                  fieldName = fieldLabel opts field
-                  e arg' = pairE letInsert target fieldName (toValue `appE` arg')
-              in if lifted
-                then do
-                  x <- newName "x"
-                  [|maybe mempty|] `appE` lam1E (varP x) (e (varE x)) `appE` arg
-                else e arg
+            pairs :: ExpQ
+            pairs = mconcatE (map toPair argCons)
 
         match (conP conName $ map varP args)
               (normalB $ recordSumToValue letInsert target opts multiCons (null argTys) conName pairs)
@@ -525,19 +523,6 @@ argsToValue letInsert target jc tvMap opts multiCons
               ]
           )
           []
-
-isMaybe :: (a, Type, b) -> Bool
-isMaybe (_, AppT (ConT t) _, _) = t == ''Maybe
-isMaybe _                       = False
-
-#if !MIN_VERSION_base(4,16,0)
-isOption :: (a, Type, b) -> Bool
-isOption (_, AppT (ConT t) _, _) = t == ''Semigroup.Option
-isOption _                       = False
-
-optionToMaybe :: (ExpQ, b, c) -> (ExpQ, b, c)
-optionToMaybe (a, b, c) = ([|Semigroup.getOption|] `appE` a, b, c)
-#endif
 
 (<^>) :: ExpQ -> ExpQ -> ExpQ
 (<^>) a b = infixApp a [|(E.><)|] b
@@ -570,8 +555,8 @@ array Value es = do
                doE (newMV:stmts++[ret]))
 
 -- | Wrap an associative list of keys and quoted values in a quoted 'Object'.
-objectE :: LetInsert -> ToJSONFun -> [(String, ExpQ)] -> ExpQ
-objectE letInsert target = fromPairsE target . mconcatE . fmap (uncurry (pairE letInsert target))
+objectE :: Options -> LetInsert -> ToJSONFun -> [(String, ExpQ)] -> ExpQ
+objectE opts letInsert target = fromPairsE opts target . mconcatE . fmap (uncurry (pairE letInsert target))
 
 -- | 'mconcat' a list of fixed length.
 --
@@ -581,8 +566,8 @@ mconcatE [] = [|Monoid.mempty|]
 mconcatE [x] = x
 mconcatE (x : xs) = infixApp x [|(Monoid.<>)|] (mconcatE xs)
 
-fromPairsE :: ToJSONFun -> ExpQ -> ExpQ
-fromPairsE _ = ([|fromPairs|] `appE`)
+fromPairsE :: Options -> ToJSONFun -> ExpQ -> ExpQ
+fromPairsE _ _ = ([|fromPairs|] `appE`)
 
 -- | Create (an encoding of) a key-value pair.
 --
@@ -965,6 +950,9 @@ parseRecord jc tvMap argTys opts tName conName fields obj inTaggedObject =
            (infixApp (conE conName) [|(<$>)|] x)
            xs
     where
+      defVal = if requireOptionalFields opts
+        then [|Nothing|]
+        else [|optionalDefault|]
       tagFieldNameAppender =
           if inTaggedObject then (tagFieldName (sumEncoding opts) :) else id
       knownFields = appE [|KM.fromList|] $ listE $
@@ -982,6 +970,7 @@ parseRecord jc tvMap argTys opts tName conName fields obj inTaggedObject =
                       []
               ]
       x:xs = [ [|lookupField|]
+               `appE` defVal
                `appE` dispatchParseJSON jc conName tvMap argTy
                `appE` litE (stringL $ show tName)
                `appE` litE (stringL $ constructorTagModifier opts $ nameBase conName)
@@ -1150,27 +1139,30 @@ parseTypeMismatch tName conName expected actual =
           ]
 
 class LookupField a where
-    lookupField :: (Value -> Parser a) -> String -> String
+    lookupField :: Maybe a -> (Value -> Parser a) -> String -> String
                 -> Object -> Key -> Parser a
 
 instance {-# OVERLAPPABLE #-} LookupField a where
     lookupField = lookupFieldWith
 
 instance {-# INCOHERENT #-} LookupField (Maybe a) where
-    lookupField pj _ _ = parseOptionalFieldWith pj
+    lookupField _ pj _ _ = parseOptionalFieldWith pj
 
 #if !MIN_VERSION_base(4,16,0)
 instance {-# INCOHERENT #-} LookupField (Semigroup.Option a) where
-    lookupField pj tName rec obj key =
+    lookupField _ pj tName rec obj key =
         fmap Semigroup.Option
              (lookupField (fmap Semigroup.getOption . pj) tName rec obj key)
 #endif
 
-lookupFieldWith :: (Value -> Parser a) -> String -> String
+lookupFieldWith :: Maybe a -> (Value -> Parser a) -> String -> String
                 -> Object -> Key -> Parser a
-lookupFieldWith pj tName rec obj key =
+lookupFieldWith maybeDefault pj tName rec obj key =
     case KM.lookup key obj of
-      Nothing -> unknownFieldFail tName rec (Key.toString key)
+      Nothing ->
+        case maybeDefault of
+          Nothing -> unknownFieldFail tName rec (Key.toString key)
+          Just x -> pure x
       Just v  -> pj v <?> Key key
 
 unknownFieldFail :: String -> String -> String -> Parser fail

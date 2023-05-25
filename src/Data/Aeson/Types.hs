@@ -137,6 +137,8 @@ module Data.Aeson.Types
     , unwrapUnaryRecords
     , tagSingleConstructors
     , rejectUnknownFields
+    , requireOptionalFields
+    , omitOptionalFields
 
     -- ** Options utilities
     , SumEncoding(..)

@@ -69,6 +69,8 @@ module Data.Aeson.Types.Internal
         , unwrapUnaryRecords
         , tagSingleConstructors
         , rejectUnknownFields
+        , requireOptionalFields
+        , omitOptionalFields
         )
 
     , SumEncoding(..)
@@ -473,7 +475,7 @@ arbScientific = Sci.scientific <$> QC.arbitrary <*> QC.arbitrary
 
 shrScientific :: Scientific -> [Scientific]
 shrScientific s = map (uncurry Sci.scientific) $
-    QC.shrink (Sci.coefficient s, Sci.base10Exponent s) 
+    QC.shrink (Sci.coefficient s, Sci.base10Exponent s)
 
 arbObject :: Int -> QC.Gen Object
 arbObject n = do
@@ -786,10 +788,12 @@ data Options = Options
       -- ^ Applies only to 'Data.Aeson.FromJSON' instances. If a field appears in
       -- the parsed object map, but does not appear in the target object, parsing
       -- will fail, with an error message indicating which fields were unknown.
+    , requireOptionalFields :: Bool
+    , omitOptionalFields :: Bool
     }
 
 instance Show Options where
-  show (Options f c a o s u t r) =
+  show (Options f c a o s u t r afs ofs) =
        "Options {"
     ++ intercalate ", "
       [ "fieldLabelModifier =~ " ++ show (f "exampleField")
@@ -800,6 +804,8 @@ instance Show Options where
       , "unwrapUnaryRecords = " ++ show u
       , "tagSingleConstructors = " ++ show t
       , "rejectUnknownFields = " ++ show r
+      , "requireOptionalFields = " ++ show afs
+      , "omitOptionalFields = " ++ show ofs
       ]
     ++ "}"
 
@@ -882,6 +888,8 @@ data JSONKeyOptions = JSONKeyOptions
 -- , 'unwrapUnaryRecords'      = False
 -- , 'tagSingleConstructors'   = False
 -- , 'rejectUnknownFields'     = False
+-- , 'requireOptionalFields'   = False
+-- , 'omitOptionalFields'      = False
 -- }
 -- @
 defaultOptions :: Options
@@ -894,6 +902,8 @@ defaultOptions = Options
                  , unwrapUnaryRecords      = False
                  , tagSingleConstructors   = False
                  , rejectUnknownFields     = False
+                 , requireOptionalFields   = False
+                 , omitOptionalFields      = False
                  }
 
 -- | Default 'TaggedObject' 'SumEncoding' options:
