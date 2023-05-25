@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
-module UnitTests.OptionalFields.OmitOptionalFields.TH (omitTH) where
+module UnitTests.OptionalFields.TH (omitTH) where
 
 import UnitTests.OptionalFields.Common
 

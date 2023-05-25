@@ -69,7 +69,6 @@ module Data.Aeson.Types.Internal
         , unwrapUnaryRecords
         , tagSingleConstructors
         , rejectUnknownFields
-        , requireOptionalFields
         )
 
     , SumEncoding(..)
@@ -787,11 +786,10 @@ data Options = Options
       -- ^ Applies only to 'Data.Aeson.FromJSON' instances. If a field appears in
       -- the parsed object map, but does not appear in the target object, parsing
       -- will fail, with an error message indicating which fields were unknown.
-    , requireOptionalFields :: Bool
     }
 
 instance Show Options where
-  show (Options f c a o s u t r rof) =
+  show (Options f c a o s u t r) =
        "Options {"
     ++ intercalate ", "
       [ "fieldLabelModifier =~ " ++ show (f "exampleField")
@@ -802,7 +800,6 @@ instance Show Options where
       , "unwrapUnaryRecords = " ++ show u
       , "tagSingleConstructors = " ++ show t
       , "rejectUnknownFields = " ++ show r
-      , "requireOptionalFields = " ++ show rof
       ]
     ++ "}"
 
@@ -885,7 +882,6 @@ data JSONKeyOptions = JSONKeyOptions
 -- , 'unwrapUnaryRecords'      = False
 -- , 'tagSingleConstructors'   = False
 -- , 'rejectUnknownFields'     = False
--- , 'requireOptionalFields'   = False
 -- }
 -- @
 defaultOptions :: Options
@@ -898,7 +894,6 @@ defaultOptions = Options
                  , unwrapUnaryRecords      = False
                  , tagSingleConstructors   = False
                  , rejectUnknownFields     = False
-                 , requireOptionalFields   = False
                  }
 
 -- | Default 'TaggedObject' 'SumEncoding' options:

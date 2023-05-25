@@ -1351,15 +1351,17 @@ instance ( RecordFromJSON' arity a
 instance (Selector s, GFromJSON arity a) =>
          RecordFromJSON' arity (S1 s a) where
     recordParseJSON' (cname :* tname :* opts :* fargs) obj =
-      if requireOptionalFields opts || label `KM.member` obj
-        then parseFieldValue
-        else case maybeDef of
-          Nothing -> parseFieldValue
-          Just def -> pure def
+      handleMissingKey parseFieldValue
       where
         parseFieldValue = do
           fv <- contextCons cname tname (obj .: label)
           M1 <$> gParseJSON opts fargs fv <?> Key label
+
+        handleMissingKey p =
+          case maybeDef of
+            Nothing -> p
+            _ | label `KM.member` obj -> p
+            Just def -> pure def
 
         maybeDef = gOptionalDefault (undefined :: proxy arity) (undefined :: proxy' (S1 s a))
         label = Key.fromString $ fieldLabelModifier opts sname

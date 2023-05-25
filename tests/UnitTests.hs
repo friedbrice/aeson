@@ -444,7 +444,6 @@ showOptions =
         ++ ", unwrapUnaryRecords = False"
         ++ ", tagSingleConstructors = False"
         ++ ", rejectUnknownFields = False"
-        ++ ", requireOptionalFields = False"
         ++ "}")
         (show defaultOptions)
 

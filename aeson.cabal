@@ -195,10 +195,8 @@ test-suite aeson-tests
     UnitTests.NullaryConstructors
     UnitTests.OptionalFields
     UnitTests.OptionalFields.Common
-    UnitTests.OptionalFields.OmitOptionalFields.Generics
-    UnitTests.OptionalFields.OmitOptionalFields.TH
-    UnitTests.OptionalFields.RequireOptionalFields.Generics
-    UnitTests.OptionalFields.RequireOptionalFields.TH
+    UnitTests.OptionalFields.Generics
+    UnitTests.OptionalFields.TH
 
   build-depends:
       aeson

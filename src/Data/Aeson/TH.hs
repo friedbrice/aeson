@@ -945,9 +945,7 @@ parseRecord jc tvMap argTys opts tName conName fields obj inTaggedObject =
            (infixApp (conE conName) [|(<$>)|] x)
            xs
     where
-      defVal = if requireOptionalFields opts
-        then [|Nothing|]
-        else [|optionalDefault|]
+      defVal = [|optionalDefault|]
       tagFieldNameAppender =
           if inTaggedObject then (tagFieldName (sumEncoding opts) :) else id
       knownFields = appE [|KM.fromList|] $ listE $

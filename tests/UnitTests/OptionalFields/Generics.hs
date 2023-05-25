@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
-module UnitTests.OptionalFields.OmitOptionalFields.Generics (omitGenerics) where
+module UnitTests.OptionalFields.Generics (omitGenerics) where
 
 import UnitTests.OptionalFields.Common
 
