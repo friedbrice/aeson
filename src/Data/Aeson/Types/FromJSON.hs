@@ -71,14 +71,13 @@ module Data.Aeson.Types.FromJSON
     , (.:?)
     , (.:!)
     , (.!=)
-
     -- * Internal
     , parseOptionalFieldWith
     ) where
 
 import Prelude.Compat
 
-import Control.Applicative ((<|>), Const(..), liftA2)
+import Control.Applicative ((<|>), Const(..))
 import Control.Monad (zipWithM)
 import Data.Aeson.Internal.Functions (mapKey, mapKeyO)
 import Data.Aeson.Parser.Internal (eitherDecodeWith, jsonEOF)
@@ -252,6 +251,9 @@ class GFromJSON arity f where
     -- or 'liftParseJSON' (if the @arity@ is 'One').
     gParseJSON :: Options -> FromArgs arity a -> Value -> Parser (f a)
 
+    gOptionalDefault :: proxy arity -> proxy' f -> Maybe (f a)
+    gOptionalDefault _ _ = Nothing
+
 -- | A 'FromArgs' value either stores nothing (for 'FromJSON') or it stores the
 -- two function arguments that decode occurrences of the type parameter (for
 -- 'FromJSON1').
@@ -388,6 +390,9 @@ class FromJSON a where
 
     default parseJSON :: (Generic a, GFromJSON Zero (Rep a)) => Value -> Parser a
     parseJSON = genericParseJSON defaultOptions
+
+    optionalDefault :: Maybe a
+    optionalDefault = Nothing
 
     parseJSONList :: Value -> Parser [a]
     parseJSONList = withArray "[]" $ \a ->
@@ -903,6 +908,9 @@ instance {-# OVERLAPPABLE #-} (GFromJSON arity a) => GFromJSON arity (M1 i c a) 
     gParseJSON opts fargs = fmap M1 . gParseJSON opts fargs
     {-# INLINE gParseJSON #-}
 
+    gOptionalDefault _ _ = M1 <$> gOptionalDefault (undefined :: proxy arity) (undefined :: proxy' a)
+    {-# INLINE gOptionalDefault #-}
+
 -- Information for error messages
 
 type TypeName = String
@@ -938,6 +946,9 @@ instance (FromJSON a) => GFromJSON arity (K1 i a) where
     -- Constant values are decoded using their FromJSON instance:
     gParseJSON _opts _ = fmap K1 . parseJSON
     {-# INLINE gParseJSON #-}
+
+    gOptionalDefault _ _ = K1 <$> optionalDefault
+    {-# INLINE gOptionalDefault #-}
 
 instance GFromJSON One Par1 where
     -- Direct occurrences of the last type parameter are decoded with the
@@ -1346,34 +1357,24 @@ instance ( RecordFromJSON' arity a
               <*> recordParseJSON' p obj
     {-# INLINE recordParseJSON' #-}
 
-instance {-# OVERLAPPABLE #-} (Selector s, GFromJSON arity a) =>
+instance (Selector s, GFromJSON arity a) =>
          RecordFromJSON' arity (S1 s a) where
-    recordParseJSON' (cname :* tname :* opts :* fargs) obj = do
-        fv <- contextCons cname tname (obj .: label)
-        M1 <$> gParseJSON opts fargs fv <?> Key label
+    recordParseJSON' (cname :* tname :* opts :* fargs) obj =
+      handleMissingKey maybeDef parseFieldValue
       where
+        parseFieldValue = do
+          fv <- contextCons cname tname (obj .: label)
+          M1 <$> gParseJSON opts fargs fv <?> Key label
+
+        handleMissingKey Nothing p = p
+        handleMissingKey (Just def) p = if label `KM.member` obj then p else pure def
+
+        maybeDef = gOptionalDefault (undefined :: proxy arity) (undefined :: proxy' (S1 s a))
+
         label = Key.fromString $ fieldLabelModifier opts sname
+
         sname = selName (undefined :: M1 _i s _f _p)
     {-# INLINE recordParseJSON' #-}
-
-instance {-# INCOHERENT #-} (Selector s, FromJSON a) =>
-         RecordFromJSON' arity (S1 s (K1 i (Maybe a))) where
-    recordParseJSON' (_ :* _ :* opts :* _) obj = M1 . K1 <$> obj .:? label
-      where
-        label = Key.fromString $ fieldLabelModifier opts sname
-        sname = selName (undefined :: M1 _i s _f _p)
-    {-# INLINE recordParseJSON' #-}
-
-#if !MIN_VERSION_base(4,16,0)
--- Parse an Option like a Maybe.
-instance {-# INCOHERENT #-} (Selector s, FromJSON a) =>
-         RecordFromJSON' arity (S1 s (K1 i (Semigroup.Option a))) where
-    recordParseJSON' p obj = wrap <$> recordParseJSON' p obj
-      where
-        wrap :: S1 s (K1 i (Maybe a)) p -> S1 s (K1 i (Semigroup.Option a)) p
-        wrap (M1 (K1 a)) = M1 (K1 (Semigroup.Option a))
-    {-# INLINE recordParseJSON' #-}
-#endif
 
 --------------------------------------------------------------------------------
 
@@ -1517,6 +1518,7 @@ instance FromJSON1 Maybe where
 
 instance (FromJSON a) => FromJSON (Maybe a) where
     parseJSON = parseJSON1
+    optionalDefault = Just Nothing
 
 
 instance FromJSON2 Either where
@@ -2294,6 +2296,7 @@ instance FromJSON1 Semigroup.Option where
 
 instance FromJSON a => FromJSON (Semigroup.Option a) where
     parseJSON = parseJSON1
+    optionalDefault = Just (Semigroup.Option Nothing)
 #endif
 
 -------------------------------------------------------------------------------
